@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="tr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rawlins Sasi Futbol</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/node_modules/three/build/three.module.js",
+        "cannon-es": "/node_modules/cannon-es/dist/cannon-es.js",
+        "socket.io-client": "/node_modules/socket.io-client/dist/socket.io.esm.min.js"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <div id="login-screen">
+    <div class="login-box">
+      <div class="login-title">Rawlins Sasi Futbol</div>
+      <input type="text" id="nickname-input" class="login-input" placeholder="Nick (1-8, bosluksuz)" maxlength="8" autocomplete="off">
+      <input type="password" id="admin-pass-input" class="login-input hidden" placeholder="Rawlins sifresi" autocomplete="off">
+      <button id="login-btn" class="login-btn">MACTA YER AL</button>
+      <div class="login-hint">Admin nick: Rawlins</div>
+    </div>
+  </div>
+
+  <div id="lobby-screen">
+    <div class="lobby-header">MAC LOBISI</div>
+
+    <div class="teams-container">
+      <div class="team-panel red-team">
+        <div class="team-header">KIRMIZI TAKIM</div>
+        <ul id="red-list" class="player-list"></ul>
+      </div>
+
+      <div class="team-panel spectators">
+        <div class="team-header">IZLEYICILER</div>
+        <ul id="spectator-list" class="player-list"></ul>
+      </div>
+
+      <div class="team-panel blue-team">
+        <div class="team-header">MAVI TAKIM</div>
+        <ul id="blue-list" class="player-list"></ul>
+      </div>
+    </div>
+
+    <div class="lobby-bottom">
+      <button id="lobby-spectator-toggle" class="lobby-spectator-btn">Izleyici Moduna Gec</button>
+      <button id="lobby-leave-room" class="lobby-spectator-btn">Cikis</button>
+      <span class="lobby-hint">ESC: Menu ac/kapat | Izleyiciye gecis ve donus menuden</span>
+    </div>
+  </div>
+
+  <div id="ui-overlay">
+    <h1>Rawlins Sasi Futbol</h1>
+    <p>WASD: Hareket | SHIFT: Sprint | SPACE: Sut (basili tut)</p>
+    <p>Z: Pas | C: Ara Pas | V: Orta | X: Kayma | G: Kaleci Yakalama</p>
+    <div id="power-bar-container">
+      <div id="power-bar"></div>
+    </div>
+    <div id="stamina-bar-container">
+      <div id="stamina-bar"></div>
+    </div>
+    <div id="fps-label">FPS: --</div>
+  </div>
+
+  <div id="scoreboard" class="scoreboard">
+    <div class="score-team score-team-red">
+      <div class="score-team-name">KIRMIZI</div>
+      <div id="score-red" class="score-team-score">0</div>
+    </div>
+    <div class="score-center">
+      <div class="score-divider">-</div>
+      <div id="match-timer" class="match-timer hidden">--:--</div>
+    </div>
+    <div class="score-team score-team-blue">
+      <div class="score-team-name">MAVI</div>
+      <div id="score-blue" class="score-team-score">0</div>
+    </div>
+  </div>
+
+  <div id="flow-status" class="flow-status"></div>
+
+  <div id="top-stats">
+    <span id="server-stats">Ping: -- | Snapshot gecikmesi: --</span>
+  </div>
+
+  <div id="nick-status-banner" class="nick-status-banner hidden">Nick onay bekliyor.</div>
+
+  <div id="quick-bar">
+    <button data-quick-command="pass_me">1 Pas Ver</button>
+    <button data-quick-command="im_open">2 Bostayim</button>
+    <button data-quick-command="fall_back">3 Geri Don</button>
+    <button data-quick-command="shoot">4 Sut Cek</button>
+  </div>
+
+  <div id="chat-panel">
+    <div class="chat-title">Takim Iletisimi</div>
+    <div id="chat-messages"></div>
+    <div class="chat-input-row">
+      <input id="chat-input" type="text" placeholder="Mesaj yaz (Enter)" maxlength="120" />
+      <button id="chat-send-btn">Gonder</button>
+    </div>
+  </div>
+
+  <div id="mobile-controls" class="mobile-controls hidden">
+    <div id="mobile-joystick" class="mobile-joystick">
+      <div class="mj-base"></div>
+      <div id="mj-stick" class="mj-stick"></div>
+    </div>
+
+    <div id="mobile-lookpad" class="mobile-lookpad" aria-label="Kamera"></div>
+
+    <div id="mobile-actions" class="mobile-actions">
+      <button id="m-btn-sprint" class="m-btn m-btn-small">SPRINT</button>
+      <button id="m-btn-slide" class="m-btn m-btn-small">KAY</button>
+      <button id="m-btn-pass" class="m-btn">PAS</button>
+      <button id="m-btn-through" class="m-btn">ARA</button>
+      <button id="m-btn-cross" class="m-btn">ORTA</button>
+      <button id="m-btn-shoot" class="m-btn m-btn-primary">SUT</button>
+      <button id="m-btn-menu" class="m-btn m-btn-small">MENU</button>
+      <button id="m-btn-chat" class="m-btn m-btn-small">CHAT</button>
+    </div>
+  </div>
+
+  <div id="spectator-panel" class="control-panel hidden">
+    <div class="panel-title">Izleyici Kontrolu</div>
+    <button id="spec-return-btn">Takima Don</button>
+    <label for="seat-select">Koltuk:</label>
+    <select id="seat-select"></select>
+    <div class="panel-row">
+      <button id="seat-apply-btn">Koltuge Gec</button>
+      <button id="spec-freecam-btn">Serbest Kamera</button>
+    </div>
+  </div>
+
+  <div id="admin-panel" class="control-panel hidden">
+    <div class="panel-title">Admin Paneli (Rawlins)</div>
+    <div id="admin-cap-info">Aktif: 0/24 | Izleyici: 0 | Bot: 0</div>
+    <div class="panel-row">
+      <input id="admin-cap-input" type="number" min="2" max="60" value="24" />
+      <button id="admin-cap-apply">Limit Uygula</button>
+    </div>
+    <div class="panel-row">
+      <button id="admin-add-bot">Bot Ekle</button>
+      <button id="admin-remove-bot">Bot Sil</button>
+    </div>
+
+    <div class="panel-divider"></div>
+    <div class="panel-subtitle">Mac Kontrol</div>
+    <div class="panel-row">
+      <button id="admin-restart-match">Maci Yeniden Baslat</button>
+    </div>
+    <div class="panel-row">
+      <select id="admin-duration-select">
+        <option value="0">Suresiz</option>
+        <option value="1">1 dk</option>
+        <option value="3">3 dk</option>
+        <option value="5">5 dk</option>
+        <option value="10">10 dk</option>
+        <option value="15">15 dk</option>
+        <option value="20">20 dk</option>
+      </select>
+      <button id="admin-duration-apply">Dakika Uygula</button>
+    </div>
+    <div class="panel-row">
+      <select id="admin-weather-select">
+        <option value="day">Gunduz</option>
+        <option value="night">Gece</option>
+      </select>
+      <button id="admin-weather-apply">Hava Uygula</button>
+    </div>
+
+    <div class="panel-divider"></div>
+    <div class="panel-subtitle">Nick Onay</div>
+    <div id="nick-approval-empty" class="panel-muted">Bekleyen nick yok.</div>
+    <div id="nick-approval-list" class="nick-approval-list"></div>
+  </div>
+
+  <div id="goal-overlay" class="goal-overlay">
+    <div class="goal-title">GOOL!</div>
+    <div id="goal-subtext" class="goal-subtext"></div>
+    <div id="goal-player-name" class="goal-player-name"></div>
+  </div>
+
+  <div id="ball-out-overlay" class="ball-out-overlay">
+    <div id="ball-out-text" class="ball-out-text">TOP DISARI</div>
+  </div>
+
+  <div id="replay-overlay" class="replay-overlay">
+    <div id="replay-text">REPLAY</div>
+  </div>
+
+  <div id="match-end-overlay" class="match-end-overlay">
+    <div class="match-end-title">MAC BITTI</div>
+    <div id="match-end-winner" class="match-end-winner"></div>
+    <div id="match-end-topscorer" class="match-end-topscorer"></div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>
+
