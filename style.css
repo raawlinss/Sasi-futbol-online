@@ -572,11 +572,17 @@ canvas {
     display: none;
   }
 
+  /* Mobile: hide chat by default (it blocks the screen). Can be opened via the CHAT button. */
   #chat-panel {
+    display: none;
     width: min(92vw, 520px);
     right: 10px;
     bottom: 10px;
     z-index: 3600;
+  }
+
+  #chat-panel.mobile-open {
+    display: block;
   }
 }
 

@@ -84,6 +84,16 @@ function sendChatFromInput() {
   if (!text) return;
   network.sendChat(text);
   chatInput.value = '';
+
+  // Mobile: close the chat panel after sending to free up the screen.
+  try {
+    if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+      const panel = document.getElementById('chat-panel');
+      panel?.classList?.remove?.('mobile-open');
+    }
+  } catch {
+    // ignore
+  }
 }
 
 function updateAdminPasswordVisibility() {

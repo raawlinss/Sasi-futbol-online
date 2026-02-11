@@ -1,6 +1,6 @@
 import { clamp, normalize2D, safeNumber } from '../protocol/index.js';
 
-export const SIM_VERSION = 'movement-core-v2.6';
+export const SIM_VERSION = 'movement-core-v2.7';
 
 const EPS = 1e-6;
 
@@ -30,15 +30,15 @@ export function rotateByYaw(localX, localZ, yaw) {
   const s = Math.sin(yaw);
   const c = Math.cos(yaw);
   // Camera/drive forward is (sin(yaw), cos(yaw)); right is (cos(yaw), -sin(yaw)).
-  // Input convention: localX < 0 is "right", localX > 0 is "left".
-  // (This matches the current in-game expectation where A/D were perceived as swapped.)
+  // Input convention: localX > 0 is "right", localX < 0 is "left".
+  // yaw=0 => D moves +X (right), A moves -X (left).
   const rightX = c;
   const rightZ = -s;
   const forwardX = s;
   const forwardZ = c;
   return {
-    x: (-localX) * rightX + localZ * forwardX,
-    z: (-localX) * rightZ + localZ * forwardZ
+    x: localX * rightX + localZ * forwardX,
+    z: localX * rightZ + localZ * forwardZ
   };
 }
 

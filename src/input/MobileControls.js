@@ -34,6 +34,9 @@ export function installMobileControls({ world, network }) {
   const btnCross = document.getElementById('m-btn-cross');
   const btnSlide = document.getElementById('m-btn-slide');
   const btnSprint = document.getElementById('m-btn-sprint');
+  const btnCurveLeft = document.getElementById('m-btn-curve-left');
+  const btnCurveRight = document.getElementById('m-btn-curve-right');
+  const btnKeeper = document.getElementById('m-btn-keeper');
   const btnMenu = document.getElementById('m-btn-menu');
   const btnChat = document.getElementById('m-btn-chat');
 
@@ -134,8 +137,8 @@ export function installMobileControls({ world, network }) {
     state.lastLookY = e.clientY;
 
     const p = getPlayer();
-    // Touch moves are larger than mouse movementX/Y. Scale down a bit.
-    p?.applyLookDelta?.(dx, dy, 0.55);
+    // Touch moves are larger than mouse movementX/Y. Scale down but keep responsive.
+    p?.applyLookDelta?.(dx, dy, 0.8);
     e.preventDefault?.();
   }
 
@@ -186,9 +189,25 @@ export function installMobileControls({ world, network }) {
   }
 
   function focusChat() {
+    const panel = document.getElementById('chat-panel');
     const chat = document.getElementById('chat-input');
     if (!chat) return;
+    if (panel) panel.classList.add('mobile-open');
     chat.focus?.();
+  }
+
+  function toggleChat() {
+    const panel = document.getElementById('chat-panel');
+    const chat = document.getElementById('chat-input');
+    if (!panel) return;
+    const open = panel.classList.contains('mobile-open');
+    if (open) {
+      panel.classList.remove('mobile-open');
+      chat?.blur?.();
+    } else {
+      panel.classList.add('mobile-open');
+      chat?.focus?.();
+    }
   }
 
   // Joystick
@@ -221,12 +240,25 @@ export function installMobileControls({ world, network }) {
   btnSprint?.addEventListener('pointerup', (e) => { setHeldKey(getPlayer(), 'shift', false); e.preventDefault?.(); }, { passive: false });
   btnSprint?.addEventListener('pointercancel', (e) => { setHeldKey(getPlayer(), 'shift', false); e.preventDefault?.(); }, { passive: false });
 
-  btnPass?.addEventListener('click', () => tapAction(ACTION_TYPES.pass, 0.45, 0));
-  btnThrough?.addEventListener('click', () => tapAction(ACTION_TYPES.through, 0.58, 0));
-  btnCross?.addEventListener('click', () => tapAction(ACTION_TYPES.cross, 0.62, 0));
-  btnSlide?.addEventListener('click', () => trySlide());
-  btnMenu?.addEventListener('click', () => toggleMenu());
-  btnChat?.addEventListener('click', () => focusChat());
+  const tap = (el, fn) => {
+    el?.addEventListener('pointerup', (e) => { fn(); e.preventDefault?.(); }, { passive: false });
+  };
+  tap(btnPass, () => tapAction(ACTION_TYPES.pass, 0.45, 0));
+  tap(btnThrough, () => tapAction(ACTION_TYPES.through, 0.58, 0));
+  tap(btnCross, () => tapAction(ACTION_TYPES.cross, 0.62, 0));
+  tap(btnSlide, () => trySlide());
+  tap(btnKeeper, () => tapAction(ACTION_TYPES.keeperCatch, 0, 0));
+  tap(btnMenu, () => toggleMenu());
+  tap(btnChat, () => toggleChat());
+
+  // Curve buttons (hold).
+  btnCurveLeft?.addEventListener('pointerdown', (e) => { setHeldKey(getPlayer(), 'q', true); e.preventDefault?.(); }, { passive: false });
+  btnCurveLeft?.addEventListener('pointerup', (e) => { setHeldKey(getPlayer(), 'q', false); e.preventDefault?.(); }, { passive: false });
+  btnCurveLeft?.addEventListener('pointercancel', (e) => { setHeldKey(getPlayer(), 'q', false); e.preventDefault?.(); }, { passive: false });
+
+  btnCurveRight?.addEventListener('pointerdown', (e) => { setHeldKey(getPlayer(), 'e', true); e.preventDefault?.(); }, { passive: false });
+  btnCurveRight?.addEventListener('pointerup', (e) => { setHeldKey(getPlayer(), 'e', false); e.preventDefault?.(); }, { passive: false });
+  btnCurveRight?.addEventListener('pointercancel', (e) => { setHeldKey(getPlayer(), 'e', false); e.preventDefault?.(); }, { passive: false });
 
   const onJoinAccepted = () => setVisible(true);
   const onJoinDenied = () => setVisible(false);
