@@ -51,10 +51,12 @@ export function installMobileControls({ world, network }) {
 
   const state = {
     joyPointerId: null,
+    joyTouchId: null,
     joyCx: 0,
     joyCy: 0,
     joyRadius: 52,
     lookPointerId: null,
+    lookTouchId: null,
     lastLookX: 0,
     lastLookY: 0
   };
@@ -73,25 +75,17 @@ export function installMobileControls({ world, network }) {
     if (stick) stick.style.transform = 'translate(-50%, -50%)';
   }
 
-  function onJoyDown(e) {
+  function ensureJoyCenter() {
     if (!joy) return;
-    const p = getPlayer();
-    if (!p || p.isSpectator || window.isReplayActive) return;
-
-    state.joyPointerId = e.pointerId;
-    try { joy.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-
     const r = joy.getBoundingClientRect();
     state.joyCx = r.left + r.width / 2;
     state.joyCy = r.top + r.height / 2;
-    state.joyRadius = Math.max(34, Math.min(70, r.width * 0.36));
-    e.preventDefault?.();
+    state.joyRadius = Math.max(34, Math.min(72, r.width * 0.36));
   }
 
-  function onJoyMove(e) {
-    if (state.joyPointerId === null || e.pointerId !== state.joyPointerId) return;
-    const dx = e.clientX - state.joyCx;
-    const dy = e.clientY - state.joyCy;
+  function joyApply(clientX, clientY) {
+    const dx = clientX - state.joyCx;
+    const dy = clientY - state.joyCy;
 
     const mag = Math.hypot(dx, dy);
     const m = mag > 1e-6 ? Math.min(1, mag / state.joyRadius) : 0;
@@ -108,15 +102,73 @@ export function installMobileControls({ world, network }) {
       const py = clamp(dy, -state.joyRadius, state.joyRadius);
       stick.style.transform = `translate(calc(-50% + ${px}px), calc(-50% + ${py}px))`;
     }
+  }
+
+  function joyEnd() {
+    state.joyPointerId = null;
+    state.joyTouchId = null;
+    resetMove();
+  }
+
+  function onJoyDown(e) {
+    if (!joy) return;
+    const p = getPlayer();
+    if (!p || p.isSpectator || window.isReplayActive) return;
+
+    state.joyPointerId = e.pointerId;
+    try { joy.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    ensureJoyCenter();
+    e.preventDefault?.();
+  }
+
+  function onJoyMove(e) {
+    if (state.joyPointerId === null || e.pointerId !== state.joyPointerId) return;
+    joyApply(e.clientX, e.clientY);
     e.preventDefault?.();
   }
 
   function onJoyUp(e) {
     if (state.joyPointerId === null || e.pointerId !== state.joyPointerId) return;
     try { joy?.releasePointerCapture?.(e.pointerId); } catch { /* ignore */ }
-    state.joyPointerId = null;
-    resetMove();
+    joyEnd();
     e.preventDefault?.();
+  }
+
+  // Touch fallback (iOS Safari reliability).
+  function onJoyTouchStart(e) {
+    const p = getPlayer();
+    if (!p || p.isSpectator || window.isReplayActive) return;
+    if (state.joyPointerId !== null || state.joyTouchId !== null) return;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (!t) return;
+    state.joyTouchId = t.identifier;
+    ensureJoyCenter();
+    joyApply(t.clientX, t.clientY);
+    e.preventDefault?.();
+  }
+  function onJoyTouchMove(e) {
+    if (state.joyTouchId === null) return;
+    const list = e.changedTouches || [];
+    for (let i = 0; i < list.length; i += 1) {
+      const t = list[i];
+      if (t && t.identifier === state.joyTouchId) {
+        joyApply(t.clientX, t.clientY);
+        e.preventDefault?.();
+        return;
+      }
+    }
+  }
+  function onJoyTouchEnd(e) {
+    if (state.joyTouchId === null) return;
+    const list = e.changedTouches || [];
+    for (let i = 0; i < list.length; i += 1) {
+      const t = list[i];
+      if (t && t.identifier === state.joyTouchId) {
+        joyEnd();
+        e.preventDefault?.();
+        return;
+      }
+    }
   }
 
   function onLookDown(e) {
@@ -147,6 +199,47 @@ export function installMobileControls({ world, network }) {
     try { lookpad?.releasePointerCapture?.(e.pointerId); } catch { /* ignore */ }
     state.lookPointerId = null;
     e.preventDefault?.();
+  }
+
+  function onLookTouchStart(e) {
+    const p = getPlayer();
+    if (!p || p.isSpectator || window.isReplayActive) return;
+    if (state.lookPointerId !== null || state.lookTouchId !== null) return;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (!t) return;
+    state.lookTouchId = t.identifier;
+    state.lastLookX = t.clientX;
+    state.lastLookY = t.clientY;
+    e.preventDefault?.();
+  }
+  function onLookTouchMove(e) {
+    if (state.lookTouchId === null) return;
+    const list = e.changedTouches || [];
+    for (let i = 0; i < list.length; i += 1) {
+      const t = list[i];
+      if (t && t.identifier === state.lookTouchId) {
+        const dx = t.clientX - state.lastLookX;
+        const dy = t.clientY - state.lastLookY;
+        state.lastLookX = t.clientX;
+        state.lastLookY = t.clientY;
+        const p = getPlayer();
+        p?.applyLookDelta?.(dx, dy, 0.85);
+        e.preventDefault?.();
+        return;
+      }
+    }
+  }
+  function onLookTouchEnd(e) {
+    if (state.lookTouchId === null) return;
+    const list = e.changedTouches || [];
+    for (let i = 0; i < list.length; i += 1) {
+      const t = list[i];
+      if (t && t.identifier === state.lookTouchId) {
+        state.lookTouchId = null;
+        e.preventDefault?.();
+        return;
+      }
+    }
   }
 
   function tapAction(type, charge = 0.55, curve = 0) {
@@ -215,12 +308,20 @@ export function installMobileControls({ world, network }) {
   joy?.addEventListener('pointermove', onJoyMove, { passive: false });
   joy?.addEventListener('pointerup', onJoyUp, { passive: false });
   joy?.addEventListener('pointercancel', onJoyUp, { passive: false });
+  joy?.addEventListener('touchstart', onJoyTouchStart, { passive: false });
+  joy?.addEventListener('touchmove', onJoyTouchMove, { passive: false });
+  joy?.addEventListener('touchend', onJoyTouchEnd, { passive: false });
+  joy?.addEventListener('touchcancel', onJoyTouchEnd, { passive: false });
 
   // Lookpad
   lookpad?.addEventListener('pointerdown', onLookDown, { passive: false });
   lookpad?.addEventListener('pointermove', onLookMove, { passive: false });
   lookpad?.addEventListener('pointerup', onLookUp, { passive: false });
   lookpad?.addEventListener('pointercancel', onLookUp, { passive: false });
+  lookpad?.addEventListener('touchstart', onLookTouchStart, { passive: false });
+  lookpad?.addEventListener('touchmove', onLookTouchMove, { passive: false });
+  lookpad?.addEventListener('touchend', onLookTouchEnd, { passive: false });
+  lookpad?.addEventListener('touchcancel', onLookTouchEnd, { passive: false });
 
   // Buttons
   btnShoot?.addEventListener('pointerdown', (e) => {
@@ -279,10 +380,18 @@ export function installMobileControls({ world, network }) {
       joy?.removeEventListener('pointermove', onJoyMove);
       joy?.removeEventListener('pointerup', onJoyUp);
       joy?.removeEventListener('pointercancel', onJoyUp);
+      joy?.removeEventListener('touchstart', onJoyTouchStart);
+      joy?.removeEventListener('touchmove', onJoyTouchMove);
+      joy?.removeEventListener('touchend', onJoyTouchEnd);
+      joy?.removeEventListener('touchcancel', onJoyTouchEnd);
       lookpad?.removeEventListener('pointerdown', onLookDown);
       lookpad?.removeEventListener('pointermove', onLookMove);
       lookpad?.removeEventListener('pointerup', onLookUp);
       lookpad?.removeEventListener('pointercancel', onLookUp);
+      lookpad?.removeEventListener('touchstart', onLookTouchStart);
+      lookpad?.removeEventListener('touchmove', onLookTouchMove);
+      lookpad?.removeEventListener('touchend', onLookTouchEnd);
+      lookpad?.removeEventListener('touchcancel', onLookTouchEnd);
       window.removeEventListener('join:accepted', onJoinAccepted);
       window.removeEventListener('join:denied', onJoinDenied);
       window.removeEventListener('socket:state', onSocketState);

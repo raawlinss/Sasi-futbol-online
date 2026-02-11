@@ -117,8 +117,11 @@ export class Player {
     this.emoteUntilMs = 0;
 
     // Mobile/touch inputs (analog).
+    this.mobileMoveTargetX = 0;
+    this.mobileMoveTargetZ = 0;
     this.mobileMoveX = 0;
     this.mobileMoveZ = 0;
+    this.lastMobileMoveAt = 0;
 
     this.initVisuals();
     this.initPhysics(position);
@@ -597,8 +600,9 @@ export class Player {
   }
 
   setMobileMove(x, z) {
-    this.mobileMoveX = Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
-    this.mobileMoveZ = Number.isFinite(z) ? Math.max(-1, Math.min(1, z)) : 0;
+    this.mobileMoveTargetX = Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
+    this.mobileMoveTargetZ = Number.isFinite(z) ? Math.max(-1, Math.min(1, z)) : 0;
+    this.lastMobileMoveAt = performance.now();
   }
 
   applyLookDelta(dx, dy, scale = 1.0) {
@@ -819,9 +823,25 @@ export class Player {
     let moveX = (right ? 1 : 0) - (left ? 1 : 0);
 
     // Mobile joystick overrides digital keys when active.
-    if (Math.abs(this.mobileMoveX) + Math.abs(this.mobileMoveZ) > 0.01) {
-      moveX = this.mobileMoveX;
-      moveZ = this.mobileMoveZ;
+    {
+      // Smooth mobile analog input so it feels "pro" and avoids sticky jumps.
+      const alpha = 1 - Math.exp(-18 * Math.max(0, delta));
+      this.mobileMoveX = THREE.MathUtils.lerp(this.mobileMoveX, this.mobileMoveTargetX, alpha);
+      this.mobileMoveZ = THREE.MathUtils.lerp(this.mobileMoveZ, this.mobileMoveTargetZ, alpha);
+
+      // Safety: if we haven't received joystick updates for a while, decay to zero (prevents "stuck" move).
+      const since = performance.now() - (this.lastMobileMoveAt || 0);
+      if (since > 220 && (Math.abs(this.mobileMoveTargetX) + Math.abs(this.mobileMoveTargetZ)) < 0.02) {
+        this.mobileMoveX *= 0.82;
+        this.mobileMoveZ *= 0.82;
+        if (Math.abs(this.mobileMoveX) < 0.015) this.mobileMoveX = 0;
+        if (Math.abs(this.mobileMoveZ) < 0.015) this.mobileMoveZ = 0;
+      }
+
+      if (Math.abs(this.mobileMoveX) + Math.abs(this.mobileMoveZ) > 0.02) {
+        moveX = this.mobileMoveX;
+        moveZ = this.mobileMoveZ;
+      }
     }
     const isMoving = moveX !== 0 || moveZ !== 0;
 

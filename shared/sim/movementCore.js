@@ -1,6 +1,6 @@
 import { clamp, normalize2D, safeNumber } from '../protocol/index.js';
 
-export const SIM_VERSION = 'movement-core-v2.7';
+export const SIM_VERSION = 'movement-core-v2.8';
 
 const EPS = 1e-6;
 
@@ -37,8 +37,10 @@ export function rotateByYaw(localX, localZ, yaw) {
   const forwardX = s;
   const forwardZ = c;
   return {
-    x: localX * rightX + localZ * forwardX,
-    z: localX * rightZ + localZ * forwardZ
+    // NOTE: Some earlier versions had A/D swapped in practice; flipping localX here keeps
+    // keyboard + mobile joystick consistent (single source of truth).
+    x: (-localX) * rightX + localZ * forwardX,
+    z: (-localX) * rightZ + localZ * forwardZ
   };
 }
 
